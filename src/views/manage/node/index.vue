@@ -4,11 +4,14 @@
       <el-form-item label="点位名称" prop="nodeName">
         <el-input v-model="queryParams.nodeName" placeholder="请输入点位名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="区域ID" prop="regionId">
-        <el-input v-model="queryParams.regionId" placeholder="请输入区域ID" clearable @keyup.enter="handleQuery" />
-      </el-form-item>
-      <el-form-item label="合作商ID" prop="partnerId">
-        <el-input v-model="queryParams.partnerId" placeholder="请输入合作商ID" clearable @keyup.enter="handleQuery" />
+      <el-form-item label="区域搜索" prop="regionId">
+        <!-- <el-input v-model="queryParams.regionId" placeholder="请输入区域ID" clearable @keyup.enter="handleQuery" /> -->
+        <!-- 下拉框展示区域 -->
+        <el-select v-model="queryParams.regionId" placeholder="请选择区域" clearable>
+          <el-option v-for="item in regionList" :key="item.id" :label="item.regionName" :value="item.id">
+
+          </el-option>
+        </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -37,21 +40,21 @@
 
     <el-table v-loading="loading" :data="nodeList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="主键id" align="center" prop="id" />
+      <el-table-column label="序号" type="index" width="50" align="center" prop="id" />
       <el-table-column label="点位名称" align="center" prop="nodeName" />
-      <el-table-column label="详细地址" align="center" prop="address" />
+      <el-table-column label="区域ID" align="center" prop="regionId" />
       <el-table-column label="商圈类型" align="center" prop="businessType">
         <template #default="scope">
           <dict-tag :options="business_type" :value="scope.row.businessType" />
         </template>
       </el-table-column>
-      <el-table-column label="区域ID" align="center" prop="regionId" />
       <el-table-column label="合作商ID" align="center" prop="partnerId" />
+      <el-table-column label="详细地址" align="left" prop="address" show-overflow-tooltip />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
+          <el-button link type="primary" @click="handleUpdate(scope.row)"
             v-hasPermi="['manage:node:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)"
+          <el-button link type="primary" @click="handleDelete(scope.row)"
             v-hasPermi="['manage:node:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -62,12 +65,17 @@
 
     <!-- 添加或修改点位管理对话框 -->
     <el-dialog :title="title" v-model="open" width="500px" append-to-body>
-      <el-form ref="nodeRef" :model="form" :rules="rules" label-width="80px">
+      <el-form ref="nodeRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="点位名称" prop="nodeName">
           <el-input v-model="form.nodeName" placeholder="请输入点位名称" />
         </el-form-item>
-        <el-form-item label="详细地址" prop="address">
-          <el-input v-model="form.address" type="textarea" placeholder="请输入内容" />
+        <el-form-item label="所属区域" prop="regionId">
+          <!-- <el-input v-model="form.regionId" placeholder="请输入区域ID" /> -->
+          <!-- 下拉框展示区域 -->
+          <el-select v-model="form.regionId" placeholder="请选择区域">
+            <el-option v-for="item in regionList" :key="item.id" :label="item.regionName" :value="item.id">
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="商圈类型" prop="businessType">
           <el-select v-model="form.businessType" placeholder="请选择商圈类型">
@@ -75,11 +83,17 @@
               :value="parseInt(dict.value)"></el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="区域ID" prop="regionId">
-          <el-input v-model="form.regionId" placeholder="请输入区域ID" />
+
+        <!-- 编写下拉框样式的合作商ID选择操作 -->
+        <el-form-item label="归属合作商" prop="partnerId">
+          <!-- <el-input v-model="form.partnerId" placeholder="请输入合作商ID" /> -->
+          <el-select v-model="form.partnerId" placeholder="请选择合作商">
+            <el-option v-for="item in partnerList" :key="item.id" :label="item.partnerName"
+              :value="item.id"></el-option>
+          </el-select>
         </el-form-item>
-        <el-form-item label="合作商ID" prop="partnerId">
-          <el-input v-model="form.partnerId" placeholder="请输入合作商ID" />
+        <el-form-item label="详细地址" prop="address">
+          <el-input v-model="form.address" type="textarea" placeholder="请输入内容" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -97,6 +111,11 @@
 import { listNode, getNode, delNode, addNode, updateNode } from "@/api/manage/node";
 // 引入查询列表的操作
 import { listRegion } from "@/api/manage/region";
+
+// 引入合作商操作
+import { listPartner } from "@/api/manage/partner";
+import { loadAllParams } from "@/api/page";
+
 
 const { proxy } = getCurrentInstance();
 const { business_type } = proxy.useDict('business_type');
@@ -252,21 +271,36 @@ function handleExport() {
 }
 
 // 响应式的查询所有的条件对象
-const loadAllParame = reactive({
-  pageNum: 1,
-  pageSize: 10000
-})
+// const loadAllParams = reactive({
+//   pageNum: 1,
+//   pageSize: 10000
+// })
+// 上面的代码已经在page.vue中被抽取，这里可以直接进行引用
 
 
 // 定义查询区域列表的操作
+// 下面这个const用于存储返回信息
 const regionList = ref([]);
 function getRegionList() {
-  listRegion(loadAllParame).then(response => {
+  listRegion(loadAllParams).then(response => {
     // 这里返回来是response中的rows对象，并且最终被regionlist进行接收。
     regionList.value = response.rows;
   });
 }
 
+// 定义查询合作商列表的操作
+// 下面这个const用于存储返回信息
+const partnerList = ref([]);
+function getPartnerList() {
+  listPartner(loadAllParams).then(response => {
+    // 这里返回来是response中的rows对象，并且最终被regionlist进行接收。     
+    partnerList.value = response.rows;
+  });
+}
+
+
+// 调用对应函数进行查询
+getPartnerList();
 getRegionList();
 getList();
 </script>
