@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="90px">
       <el-form-item label="区域名称" prop="regionName">
         <el-input v-model="queryParams.regionName" placeholder="请输入区域名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
@@ -33,6 +33,7 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="序号" type="index" width="50" align="center" prop="id" />
       <el-table-column label="区域名称" align="center" prop="regionName" />
+      <el-table-column label="点位数" align="center" prop="nodeCount" />
       <el-table-column label="备注说明" align="center" prop="remark" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
