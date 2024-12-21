@@ -50,7 +50,13 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="设备状态" align="center" prop="vmStatus" />
+      <!-- <el-table-column label="设备状态" align="center" prop="vmStatus" /> -->
+      <el-table-column label="设备状态" align="center" prop="vmStatus">
+        <template #default="scope">
+          {{ scope.row.runningStatus != null ? JSON.parse(scope.row.runningStatus).status == true ? '正常' : '异常' : '异常'
+          }}
+        </template>
+      </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
           <el-button link type="primary" @click="handleUpdate(scope.row)" v-hasPermi="['manage:vm:edit']">修改</el-button>

@@ -52,6 +52,8 @@
       <el-table-column label="详细地址" align="left" prop="address" show-overflow-tooltip />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-button link type="primary" @click="getNodeInfo(scope.row)"
+            v-hasPermi="['manage:vm:list']">查看详情</el-button>
           <el-button link type="primary" @click="handleUpdate(scope.row)"
             v-hasPermi="['manage:node:edit']">修改</el-button>
           <el-button link type="primary" @click="handleDelete(scope.row)"
@@ -64,7 +66,7 @@
       v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 添加或修改点位管理对话框 -->
-    <el-dialog :title="title" v-model="open" width="500px" append-to-body>
+    <el-dialog :title="title" v-model="open" width="600px" append-to-body>
       <el-form ref="nodeRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="点位名称" prop="nodeName">
           <el-input v-model="form.nodeName" placeholder="请输入点位名称" />
@@ -103,6 +105,26 @@
         </div>
       </template>
     </el-dialog>
+    <!-- 查看详情对话框 -->
+    <el-dialog title="点位详情" v-model="nodeOpen" width="500px" append-to-body>
+      <el-table :data="vmList">
+        <el-table-column label="序号" type="index" width="55" align="center" />
+        <el-table-column label="设备编号" align="center" prop="innerCode" />
+
+        <!-- 根据设备型号查询具体的设备信息显示在页面上，下面用了一个循环显示 -->
+        <el-table-column label="设备状态" align="center" prop="vmStatus">
+          <template #default="scope">
+            {{ scope.row.vmStatus != null ? (scope.row.vmStatus == 1 ? '运营' : '未运营') : '未运营' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="最后一次供货时间" align="center" prop="vmStatus">
+          <template #default="scope">
+            <!-- {{ parseTime(scope.row.lastSupplyTime, '{y}-{m}-{d} {h}:{i}:{s}') }} -->
+            <span>{{ parseTime(scope.row.lastSupplyTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -115,10 +137,13 @@ import { listRegion } from "@/api/manage/region";
 // 引入合作商操作
 import { listPartner } from "@/api/manage/partner";
 import { loadAllParams } from "@/api/page";
+import { listVm } from "@/api/manage/vm";
+
 
 
 const { proxy } = getCurrentInstance();
 const { business_type } = proxy.useDict('business_type');
+const { vm_status } = proxy.useDict('vm_status');
 
 const nodeList = ref([]);
 const open = ref(false);
@@ -230,6 +255,22 @@ function handleUpdate(row) {
     title.value = "修改点位管理";
   });
 }
+
+// 查看详情
+const nodeOpen = ref(false);
+const vmList = ref([]);
+function getNodeInfo(row) {
+  //根据点位，查询设备列表
+  loadAllParams.nodeId = row.id;
+  listVm(loadAllParams).then(response => {
+    // 这里返回来是response中的rows对象，并且最终被vmList进行接收。
+    vmList.value = response.rows;
+    //当点击查看详情之后，会将nodeOpen设置为true，之后进行展示
+    nodeOpen.value = true;
+  });
+}
+
+
 
 /** 提交按钮 */
 function submitForm() {
