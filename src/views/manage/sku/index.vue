@@ -4,6 +4,9 @@
       <el-form-item label="商品名称" prop="skuName">
         <el-input v-model="queryParams.skuName" placeholder="请输入商品名称" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <!-- <el-form-item label="商品类型Id" prop="classId">
+        <el-input v-model="queryParams.classId" placeholder="请输入商品类型Id" clearable @keyup.enter="handleQuery" />
+      </el-form-item> -->
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -26,12 +29,16 @@
         <el-button type="warning" plain icon="Download" @click="handleExport"
           v-hasPermi="['manage:sku:export']">导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" plain icon="Upload" @click="handleImport"
+          v-hasPermi="['manage:sku:add']">导入</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="skuList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="序号" type="index" width="50" align="center" prop="skuId" />
+      <el-table-column label="序号" align="center" prop="skuId" />
       <el-table-column label="商品名称" align="center" prop="skuName" />
       <el-table-column label="商品图片" align="center" prop="skuImage" width="100">
         <template #default="scope">
@@ -44,7 +51,7 @@
         <template #default="scope">
           <el-tag>{{ scope.row.price / 100 }}元</el-tag>
         </template>
-      </el-table-column>/>
+      </el-table-column>
       <el-table-column label="商品类型" align="center" prop="classId">
         <template #default="scope">
           <div v-for="item in skuClassList" :key="item.classId">
@@ -54,14 +61,14 @@
       </el-table-column>
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
+          <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)"
+          <el-button link type="primary" @click="handleUpdate(scope.row)"
             v-hasPermi="['manage:sku:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)"
+          <el-button link type="primary" @click="handleDelete(scope.row)"
             v-hasPermi="['manage:sku:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -76,20 +83,25 @@
         <el-form-item label="商品名称" prop="skuName">
           <el-input v-model="form.skuName" placeholder="请输入商品名称" />
         </el-form-item>
-        <el-form-item label="商品图片" prop="skuImage">
-          <image-upload v-model="form.skuImage" />
-        </el-form-item>
         <el-form-item label="品牌" prop="brandName">
           <el-input v-model="form.brandName" placeholder="请输入品牌" />
         </el-form-item>
-        <el-form-item label="规格(净含量)" prop="unit">
-          <el-input v-model="form.unit" placeholder="请输入规格(净含量)" />
+        <el-form-item label="商品价格" prop="price">
+          <el-input-number :min="0.01" :max="999.99" :precision="2" :step="0.5" v-model="form.price"
+            placeholder="请输入商品价格" />元
         </el-form-item>
-        <el-form-item label="商品价格，单位分" prop="price">
-          <el-input v-model="form.price" placeholder="请输入商品价格，单位分" />
+        <el-form-item label="商品类型" prop="classId">
+          <!-- <el-input v-model="form.classId" placeholder="请输入商品类型" /> -->
+          <el-select v-model="form.classId" placeholder="请选择商品类型">
+            <el-option v-for="item in skuClassList" :key="item.classId" :label="item.className"
+              :value="item.classId"></el-option>
+          </el-select>
         </el-form-item>
-        <el-form-item label="商品类型Id" prop="classId">
-          <el-input v-model="form.classId" placeholder="请输入商品类型Id" />
+        <el-form-item label="规格" prop="unit">
+          <el-input v-model="form.unit" placeholder="请输入规格" />
+        </el-form-item>
+        <el-form-item label="商品图片" prop="skuImage">
+          <image-upload v-model="form.skuImage" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -99,6 +111,23 @@
         </div>
       </template>
     </el-dialog>
+    <!-- 数据导入对话框 -->
+    <el-dialog title="数据导入" v-model="excelOpen" width="300px" append-to-body>
+      <el-upload ref="uploadRef" class="upload-demo" :action="uploadExcelUrl" :headers="headers" :auto-upload="false"
+        :on-success="handleUploadSuccess" :on-error="handleUploadError">
+        <template #trigger>
+          <el-button type="primary">上传文件</el-button>
+        </template>
+        <el-button class="ml-3" type="success" @click="submitUpload">
+          上传
+        </el-button>
+        <template #tip>
+          <div class="el-upload__tip">
+            上传文件仅支持，xls/xlsx格式，文件大小不得超过1M
+          </div>
+        </template>
+      </el-upload>
+    </el-dialog>
   </div>
 </template>
 
@@ -106,7 +135,8 @@
 import { listSku, getSku, delSku, addSku, updateSku } from "@/api/manage/sku";
 import { listSkuClass } from "@/api/manage/skuClass";
 import { loadAllParams } from "@/api/page";
-
+import { ref } from "vue";
+import { getToken } from "@/utils/auth";
 
 const { proxy } = getCurrentInstance();
 
@@ -119,6 +149,21 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
+
+//上传图片之前的校验操作
+const props = defineProps({
+  modelValue: [String, Object, Array],
+  // 大小限制(MB)
+  fileSize: {
+    type: Number,
+    default: 1,
+  },
+  // 文件类型, 例如["xls", "xlsx"]
+  fileType: {
+    type: Array,
+    default: () => ["xls", "xlsx"],
+  },
+});
 
 const data = reactive({
   form: {},
@@ -217,6 +262,8 @@ function handleUpdate(row) {
   const _skuId = row.skuId || ids.value
   getSku(_skuId).then(response => {
     form.value = response.data;
+    // 需要进行修改价格操作，对于回显的价格，需要除以100，以方便与回显转换成元
+    form.value.price /= 100;
     open.value = true;
     title.value = "修改商品管理";
   });
@@ -226,6 +273,8 @@ function handleUpdate(row) {
 function submitForm() {
   proxy.$refs["skuRef"].validate(valid => {
     if (valid) {
+      // 将价格单位从元转换为分
+      form.value.price *= 100;
       if (form.value.skuId != null) {
         updateSku(form.value).then(response => {
           proxy.$modal.msgSuccess("修改成功");
@@ -261,14 +310,79 @@ function handleExport() {
   }, `sku_${new Date().getTime()}.xlsx`)
 }
 
-// 查询商品类型列表
+// 导入按钮操作
+const excelOpen = ref(false);
+function handleImport() {
+  excelOpen.value = true;
+}
+
+// 上传excel文件代码
+const uploadRef = ref(null);
+function submitUpload() {
+  uploadRef.value.submit();
+}
+/* 上传地址 */
+const uploadExcelUrl = ref(import.meta.env.VITE_APP_BASE_API + "/manage/sku/import"); // 上传excel文件地址
+/* 上传请求头 */
+const headers = ref({ Authorization: "Bearer " + getToken() });
+
+// 上传成功回调
+function handleUploadSuccess(res, file) {
+  if (res.code === 200) {
+    proxy.$modal.msgSuccess("上传excel成功");
+    excelOpen.value = false;
+    getList();//查询最新状态
+  } else {
+    proxy.$modal.msgError(res.msg);
+  }
+  uploadRef.value.clearFiles();
+  proxy.$modal.closeLoading();
+}
+
+// 上传失败
+function handleUploadError() {
+  proxy.$modal.msgError("上传excel失败");
+  uploadRef.value.clearFiles();
+  proxy.$modal.closeLoading();
+}
+
+// 上传前loading加载
+function handleBeforeUpload(file) {
+  let isExcel = false;
+  if (props.fileType.length) {
+    let fileExtension = "";
+    if (file.name.lastIndexOf(".") > -1) {
+      fileExtension = file.name.slice(file.name.lastIndexOf(".") + 1);
+    }
+    isExcel = props.fileType.some(type => {
+      if (file.type.indexOf(type) > -1) return true;
+      if (fileExtension && fileExtension.indexOf(type) > -1) return true;
+      return false;
+    });
+  }
+  if (!isExcel) {
+    proxy.$modal.msgError(
+      `文件格式不正确, 请上传${props.fileType.join("/")}格式文件!`
+    );
+    return false;
+  }
+  if (props.fileSize) {
+    const isLt = file.size / 1024 / 1024 < props.fileSize;
+    if (!isLt) {
+      proxy.$modal.msgError(`上传excel大小不能超过 ${props.fileSize} MB!`);
+      return false;
+    }
+  }
+  proxy.$modal.loading("正在上传excel，请稍候...");
+}
+
+/* 查询商品类型列表 */
 const skuClassList = ref([]);
-function loadClassList() {
+function getSkuClassList() {
   listSkuClass(loadAllParams).then(response => {
     skuClassList.value = response.rows;
   });
 }
-
 getSkuClassList();
 getList();
 </script>
