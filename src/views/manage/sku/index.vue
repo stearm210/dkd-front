@@ -114,7 +114,7 @@
     <!-- 数据导入对话框 -->
     <el-dialog title="数据导入" v-model="excelOpen" width="300px" append-to-body>
       <el-upload ref="uploadRef" class="upload-demo" :action="uploadExcelUrl" :headers="headers" :auto-upload="false"
-        :on-success="handleUploadSuccess" :on-error="handleUploadError">
+        :on-success="handleUploadSuccess" :on-error="handleUploadError" :before-upload="handleBeforeUpload" :limit="1">
         <template #trigger>
           <el-button type="primary">上传文件</el-button>
         </template>
@@ -310,7 +310,7 @@ function handleExport() {
   }, `sku_${new Date().getTime()}.xlsx`)
 }
 
-// 导入按钮操作
+// 打开数据导入对话框
 const excelOpen = ref(false);
 function handleImport() {
   excelOpen.value = true;
